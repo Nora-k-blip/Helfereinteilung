@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Helfer-Anmeldung</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="inner">
+      <h1 id="event-name">Helfer-Anmeldung</h1>
+      <div class="sub" id="event-date"></div>
+    </div>
+  </header>
+
+  <main>
+    <div id="me-banner"></div>
+    <div class="card" id="intro" hidden>
+      <p class="pre" id="intro-text"></p>
+      <p class="muted pre small" id="contact-info"></p>
+    </div>
+    <div id="closed" class="card notice warn" hidden>
+      Die Anmeldung ist derzeit geschlossen. Bei Fragen wende dich bitte an die Turnierleitung.
+    </div>
+    <div class="row no-print" style="margin-bottom:12px">
+      <label class="check"><input type="checkbox" id="only-free"> Nur Schichten mit freien Plätzen zeigen</label>
+    </div>
+    <div id="positions"><p class="muted">Lade Schichten …</p></div>
+  </main>
+
+  <dialog id="signup-dialog">
+    <form method="dialog" id="signup-form" novalidate>
+      <h2>Für diese Schicht eintragen</h2>
+      <p class="muted" id="dlg-shift"></p>
+
+      <div id="dlg-known" hidden>
+        <p>Eintragen als <strong id="dlg-known-name"></strong>.</p>
+        <p><button type="button" class="link" id="dlg-someone-else">Eine andere Person eintragen</button></p>
+      </div>
+
+      <div id="dlg-new" class="form-stack">
+        <label>Vor- und Nachname*<input name="name" autocomplete="name" maxlength="80"></label>
+        <label>E-Mail<input name="email" type="email" autocomplete="email" maxlength="200"></label>
+        <label>Telefon (für kurzfristige Rückfragen)<input name="phone" type="tel" autocomplete="tel" maxlength="40"></label>
+        <p class="muted small">Bitte mindestens E-Mail oder Telefon angeben. Deine Daten sieht nur die Turnierleitung.</p>
+      </div>
+      <div class="form-stack">
+        <label>Bemerkung (optional)<textarea name="note" maxlength="300" placeholder="z. B. komme mit Auto, bringe Kuchen mit …"></textarea></label>
+      </div>
+      <label class="hp" aria-hidden="true">Website<input name="website" tabindex="-1" autocomplete="off"></label>
+
+      <p class="error" id="dlg-error" role="alert"></p>
+      <div class="row">
+        <span class="spacer"></span>
+        <button type="button" id="dlg-cancel">Abbrechen</button>
+        <button type="submit" class="primary" id="dlg-submit">Verbindlich eintragen</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="done-dialog">
+    <form method="dialog">
+      <h2>Danke, du bist eingetragen! 🐴</h2>
+      <p id="done-text"></p>
+      <p><strong>Dein persönlicher Link</strong> – damit kannst du deine Schichten jederzeit ansehen oder absagen.
+        Am besten als Lesezeichen speichern oder dir selbst schicken:</p>
+      <div class="linkbox"><input id="done-link" readonly><button type="button" id="done-copy">Kopieren</button></div>
+      <div class="row">
+        <span class="spacer"></span>
+        <a class="button" id="done-me" href="/meine-schichten">Meine Schichten</a>
+        <button class="primary" value="close" autofocus>Weitere Schicht wählen</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/common.js"></script>
+  <script src="/signup.js"></script>
+</body>
+</html>

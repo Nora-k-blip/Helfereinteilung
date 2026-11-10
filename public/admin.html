@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Admin – Helfereinteilung</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="site-header admin">
+    <div class="inner row">
+      <div>
+        <h1>Helfereinteilung · Admin</h1>
+        <div class="sub" id="event"></div>
+      </div>
+      <span class="spacer"></span>
+      <a href="/" target="_blank" rel="noopener" class="no-print">Anmeldeseite öffnen ↗</a>
+      <button id="logout" class="icon no-print" hidden>Abmelden</button>
+    </div>
+    <nav class="tabs" id="tabs" hidden>
+      <button data-tab="overview" class="active">Übersicht</button>
+      <button data-tab="volunteers">Helfer</button>
+      <button data-tab="positions">Positionen</button>
+      <button data-tab="settings">Einstellungen</button>
+    </nav>
+  </header>
+
+  <main>
+    <form id="login" class="card" hidden style="max-width:380px;margin:40px auto">
+      <h2>Anmelden</h2>
+      <div class="form-stack">
+        <label>Admin-Passwort<input type="password" name="password" autocomplete="current-password" required></label>
+      </div>
+      <p class="error" id="login-error"></p>
+      <button class="primary" type="submit">Anmelden</button>
+    </form>
+
+    <section id="tab-overview" class="tab active print">
+      <h1 class="print-only" id="print-title"></h1>
+      <div class="stats no-print" id="stats"></div>
+      <div class="row no-print" style="margin-bottom:14px">
+        <label class="check"><input type="checkbox" id="only-open"> Nur Schichten mit offenen Plätzen</label>
+        <label class="check"><input type="checkbox" id="show-contact" checked> Kontaktdaten zeigen</label>
+        <span class="spacer"></span>
+        <button id="print">Drucken</button>
+        <a class="button" href="/api/admin/export.csv">Excel/CSV-Export</a>
+      </div>
+      <div id="overview"></div>
+    </section>
+
+    <section id="tab-volunteers" class="tab">
+      <div class="row" style="margin-bottom:12px">
+        <input id="vol-search" type="search" placeholder="Helfer suchen …" style="max-width:300px">
+        <span class="spacer"></span>
+        <span class="muted" id="vol-count"></span>
+      </div>
+      <div class="card table-wrap"><table id="vol-table"></table></div>
+    </section>
+
+    <section id="tab-positions" class="tab">
+      <form id="new-position" class="card">
+        <h2>Neue Position</h2>
+        <div class="form-grid">
+          <label>Name*<input name="name" required maxlength="80"></label>
+          <label>Beginn*<input name="start" type="time" required value="09:00"></label>
+          <label>Ende*<input name="end" type="time" required value="17:00"></label>
+          <label>Anzahl Schichten*<input name="shiftCount" type="number" min="1" max="24" required value="2"></label>
+          <label>Helfer pro Schicht*<input name="peoplePerShift" type="number" min="1" max="100" required value="2"></label>
+        </div>
+        <button class="primary" type="submit">Position anlegen</button>
+        <p class="muted small" style="margin-top:8px">Der Zeitraum wird gleichmäßig auf die Schichten verteilt (gerundet auf halbe Stunden).
+          Einzelne Schichtzeiten lassen sich danach unten anpassen.</p>
+      </form>
+      <div id="position-list"></div>
+    </section>
+
+    <section id="tab-settings" class="tab">
+      <div class="card">
+        <h2>Link für Helfer</h2>
+        <p class="muted">Diesen Link an alle Helfer schicken (z. B. per WhatsApp oder E-Mail):</p>
+        <div class="linkbox"><input id="public-link" readonly><button type="button" id="copy-public">Kopieren</button></div>
+      </div>
+      <form id="settings" class="card">
+        <h2>Veranstaltung</h2>
+        <div class="form-grid">
+          <label>Name der Veranstaltung<input name="event_name" maxlength="120"></label>
+          <label>Datum<input name="event_date" type="date"></label>
+        </div>
+        <div class="form-stack">
+          <label>Begrüßungstext auf der Anmeldeseite<textarea name="intro_text" maxlength="2000" rows="4"></textarea></label>
+          <label>Kontakt bei Fragen (z. B. Name & Telefon der Helferkoordination)<textarea name="contact_info" maxlength="500" rows="2"></textarea></label>
+          <label class="check"><input type="checkbox" name="signup_open"> Anmeldung ist geöffnet</label>
+          <label class="check"><input type="checkbox" name="show_names"> Vornamen der eingetragenen Helfer öffentlich anzeigen</label>
+        </div>
+        <button class="primary" type="submit">Speichern</button>
+      </form>
+    </section>
+  </main>
+
+  <dialog id="add-dialog">
+    <form method="dialog" id="add-form" novalidate>
+      <h2>Person eintragen</h2>
+      <p class="muted" id="add-shift"></p>
+      <div class="form-stack">
+        <label>Bestehender Helfer
+          <select name="volunteerId" id="add-existing"></select>
+        </label>
+        <div id="add-new" class="form-stack">
+          <label>Name*<input name="name" maxlength="80"></label>
+          <label>E-Mail<input name="email" type="email" maxlength="200"></label>
+          <label>Telefon<input name="phone" type="tel" maxlength="40"></label>
+        </div>
+        <label>Bemerkung<input name="note" maxlength="300"></label>
+      </div>
+      <p class="error" id="add-error"></p>
+      <div class="row">
+        <span class="spacer"></span>
+        <button type="button" id="add-cancel">Abbrechen</button>
+        <button type="submit" class="primary">Eintragen</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/common.js"></script>
+  <script src="/admin.js"></script>
+</body>
+</html>

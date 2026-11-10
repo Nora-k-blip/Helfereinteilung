@@ -1,9 +1,15 @@
 {
   "name": "helfereinteilung",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "Schichtplanung für Helfer beim Reitturnier",
+  "description": "Online-Anmeldung für Helferschichten beim Reitturnier",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
-    "test": "node --test tests/*.test.js"
+    "start": "node --disable-warning=ExperimentalWarning server/index.js",
+    "dev": "ADMIN_PASSWORD=admin node --disable-warning=ExperimentalWarning --watch server/index.js",
+    "test": "node --disable-warning=ExperimentalWarning --test tests/*.test.js"
   }
 }

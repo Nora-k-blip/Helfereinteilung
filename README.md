@@ -1,53 +1,91 @@
 # Helfereinteilung
 
-Schichtplanung für Helfer bei einem eintägigen Reitturnier. Kein Server und keine
-Installation nötig: **`index.html` im Browser öffnen**. Alle Daten werden automatisch
-im Browser gespeichert.
+Online-Anmeldung für Helferschichten beim Reitturnier. Helfer tragen sich selbst
+über einen Link ein, die Turnierleitung behält im Admin-Bereich den Überblick.
 
-## Standard-Positionen
+- **Keine Abhängigkeiten**: nur Node.js (≥ 22.13), Datenbank ist eine SQLite-Datei.
+- **Für Helfer** (`/`): Schichten ansehen, freie Plätze sehen, sich eintragen (Name +
+  E-Mail oder Telefon). Danach gibt es einen **persönlichen Link** (`/meine-schichten?t=…`),
+  über den man seine Schichten sieht, Kontaktdaten ändert oder absagt. Kein Konto, kein Passwort.
+- **Für die Turnierleitung** (`/admin`): Belegung aller Schichten, Personen manuell eintragen
+  oder entfernen, Helferliste mit Kontaktdaten, Positionen und Schichtzeiten bearbeiten,
+  Anmeldung öffnen/schließen, Drucken, Excel/CSV-Export.
 
-| Position      | Zeitraum      | Schichten (3 h, 2 Personen)    |
-|---------------|---------------|--------------------------------|
-| Bahndienst    | 09:00–16:00   | 09–12, 12–15, 15–16            |
-| Bändchen      | 09:00–16:00   | 09–12, 12–15, 15–16            |
-| Kuchenverkauf | 13:00–17:00   | 13–16, 16–17                   |
+## Regeln
 
-Geht ein Zeitraum nicht glatt in 3-Stunden-Schichten auf, wird die **letzte Schicht kürzer**.
+- Eine Schicht kann nicht überbucht werden (auch nicht bei gleichzeitigen Anmeldungen).
+- Niemand kann sich für zwei Schichten eintragen, die sich zeitlich überschneiden.
+- Öffentlich sichtbar sind nur freie Plätze; auf Wunsch (Einstellung) auch Vornamen.
+  Kontaktdaten sieht nur der Admin.
 
-## Bedienung
+## Positionen
 
-1. **Helfer**: Namen eintragen, optional Kontakt, Verfügbarkeit (ab/bis),
-   maximale Anzahl Schichten und Wunschpositionen.
-2. **Einteilung**: Helfer je Platz per Auswahlliste eintragen oder mit
-   „Freie Plätze automatisch füllen“ verteilen lassen. Bereits eingetragene
-   Helfer bleiben dabei erhalten. Die automatische Verteilung beachtet die
-   Verfügbarkeit, verhindert Überschneidungen und verteilt die Stunden möglichst gleichmäßig.
-   Konflikte (z. B. jemand ist zur gleichen Zeit doppelt eingeteilt) werden rot markiert.
-3. **Positionen**: Positionen hinzufügen, umbenennen, Zeiten ändern. Schichtlänge
-   und Personen pro Schicht lassen sich pro Position einzeln oder als Standard festlegen.
-4. **Übersicht & Druck**: Plan nach Position und nach Helfer, druckbar und
-   als CSV für Excel exportierbar.
+Beim ersten Start werden diese Positionen angelegt (aus `server/seed.js`):
 
-Über „Daten speichern (JSON)“ lässt sich der Stand sichern oder an andere weitergeben.
+| Position               | Zeitraum     | Schichten | Helfer/Schicht |
+|------------------------|--------------|-----------|----------------|
+| Richterschreiber       | 09:00–17:00  | 2         | 3              |
+| Sanitärdienst          | 09:00–17:00  | 1         | 1              |
+| Abreiteplatz           | 09:00–17:00  | 1         | 1              |
+| Bändchen               | 09:00–17:00  | 3         | 2              |
+| Getränkeverkauf        | 11:00–19:00  | 3         | 1              |
+| Kuchenverkauf          | 13:00–17:00  | 2         | 1              |
+| Frühstücksvorbereitung | 06:30–07:30  | 1         | 2              |
+| Frühstücksverkauf      | 07:00–10:00  | 1         | 1              |
+| Ovalbahntordienst      | 09:00–17:00  | 2         | 1              |
+| Springer               | 08:00–19:00  | 3         | 2              |
 
-## Weitere Positionen im Code hinterlegen
+Der Zeitraum wird gleichmäßig auf die Schichten verteilt und auf halbe Stunden gerundet,
+z. B. Bändchen 09:00–11:30, 11:30–14:30, 14:30–17:00. Danach werden Positionen im
+Admin-Bereich unter **Positionen** gepflegt: neue Positionen anlegen, Zeiten, Anzahl Schichten
+und Helfer ändern, einzelne Schichtzeiten anpassen, Positionen ausblenden oder sortieren.
 
-Die Standardwerte stehen in [`js/config.js`](js/config.js):
+## Lokal starten
 
-```js
-positions: [
-  { id: 'bahndienst', name: 'Bahndienst', start: '09:00', end: '16:00' },
-  // eigene Schichtlänge / Personenzahl optional:
-  { id: 'parkplatz', name: 'Parkplatz', start: '07:30', end: '12:30',
-    shiftLengthHours: 2.5, peoplePerShift: 3 },
-]
+```bash
+ADMIN_PASSWORD=meinpasswort npm start
+# -> http://localhost:3000  und  http://localhost:3000/admin
 ```
 
-Die Datei wird nur beim ersten Start oder nach „Auf Standard zurücksetzen“ geladen.
+| Variable         | Bedeutung                                                         |
+|------------------|-------------------------------------------------------------------|
+| `ADMIN_PASSWORD` | Passwort für `/admin`. Fehlt es, wird einmalig eins erzeugt und im Log angezeigt. |
+| `PORT`           | Port (Standard `3000`)                                            |
+| `DB_PATH`        | Pfad zur Datenbank (Standard `./data/helfer.db`)                  |
+| `TRUST_PROXY=1`  | Setzen, wenn die App hinter einem Hoster/Proxy mit HTTPS läuft    |
+
+Tests: `npm test`
+
+## Online stellen
+
+Die App braucht einen Server, auf dem Node.js läuft, und **dauerhaften Speicher** für die
+Datenbankdatei. Wichtig: immer über **HTTPS** erreichbar machen.
+
+**Mit Docker** (z. B. Railway, Fly.io, Render mit Disk, eigener VPS):
+
+```bash
+docker build -t helfereinteilung .
+docker run -d -p 3000:3000 -v helfer-daten:/data -e ADMIN_PASSWORD=meinpasswort helfereinteilung
+```
+
+Beim Hoster ein Volume auf `/data` einhängen, sonst gehen die Anmeldungen bei jedem Neustart verloren.
+
+**Ohne Docker** (Server mit Node.js ≥ 22.13): Repository kopieren, dann
+`ADMIN_PASSWORD=… TRUST_PROXY=1 npm start`, z. B. als systemd-Dienst hinter nginx/Caddy.
+
+**Sicherung**: Die gesamte Datenbank ist die Datei `helfer.db` (plus `-wal`/`-shm` während
+des Betriebs). Zusätzlich liefert der CSV-Export im Admin-Bereich eine Liste aller Einteilungen.
+
+## Datenschutz
+
+Gespeichert werden Name, E-Mail und/oder Telefon sowie die gewählten Schichten. Nach dem
+Turnier können Helfer im Admin-Bereich gelöscht werden (oder die Datenbankdatei löschen).
 
 ## Aufbau
 
-- `js/config.js`: Standard-Konfiguration (Positionen, Schichtlänge, Personen)
-- `js/scheduler.js`: Planungslogik ohne Oberfläche (Schichten erzeugen, automatisch einteilen, Konflikte finden)
-- `js/app.js`: Oberfläche
-- `tests/`: Tests für die Planungslogik (`npm test`, benötigt Node.js 18+)
+- `server/shifts.js`: Zeit- und Schichtlogik
+- `server/db.js`: Datenbank und Geschäftsregeln (Kapazität, Überschneidungen, Validierung)
+- `server/app.js`: HTTP-Server, API, Admin-Anmeldung, Sicherheits-Header
+- `server/seed.js`: Startdaten
+- `public/`: Seiten für Helfer (`index.html`, `me.html`) und Admin (`admin.html`)
+- `tests/`: Tests für Schichtlogik und API
