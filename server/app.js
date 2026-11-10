@@ -49,8 +49,12 @@ function rateLimiter(limit, windowMs) {
   };
 }
 
-function createApp(options = {}) {
-  const store = openStore(options.dbFile || ':memory:', options.seed === undefined ? seed : options.seed);
+async function createApp(options = {}) {
+  const store = await openStore({
+    url: options.dbUrl,
+    authToken: options.dbAuthToken,
+    seed: options.seed === undefined ? seed : options.seed
+  });
   const log = options.log || console;
   const trustProxy = !!options.trustProxy;
 
@@ -59,21 +63,22 @@ function createApp(options = {}) {
   if (options.adminPassword) {
     adminHash = sha256(options.adminPassword);
   } else {
-    adminHash = store.getSetting('admin_password_hash') && Buffer.from(store.getSetting('admin_password_hash'), 'hex');
+    const stored = await store.getSetting('admin_password_hash');
+    adminHash = stored && Buffer.from(stored, 'hex');
     if (!adminHash) {
       const pw = crypto.randomBytes(9).toString('base64url');
       adminHash = sha256(pw);
-      store.setSetting('admin_password_hash', adminHash.toString('hex'));
+      await store.setSetting('admin_password_hash', adminHash.toString('hex'));
       log.warn(
         `\n  Kein ADMIN_PASSWORD gesetzt. Automatisch erzeugtes Admin-Passwort: ${pw}\n` +
           '  (Wird nur dieses eine Mal angezeigt. Besser: Umgebungsvariable ADMIN_PASSWORD setzen.)\n'
       );
     }
   }
-  let secret = store.getSetting('session_secret');
+  let secret = await store.getSetting('session_secret');
   if (!secret) {
     secret = crypto.randomBytes(32).toString('hex');
-    store.setSetting('session_secret', secret);
+    await store.setSetting('session_secret', secret);
   }
   const sign = (value) =>
     crypto.createHmac('sha256', secret).update(value).update(adminHash).digest('base64url');
@@ -107,43 +112,45 @@ function createApp(options = {}) {
   const routes = [];
   const route = (method, pattern, handler, opts = {}) => routes.push({ method, pattern, handler, ...opts });
   const volunteerFrom = (req) => store.volunteerByToken(req.headers['x-volunteer-token']);
+  async function requireVolunteer(req) {
+    const v = await volunteerFrom(req);
+    if (!v) throw new HttpError(401, 'Dieser persönliche Link ist ungültig.');
+    return v;
+  }
 
   // Öffentlich
-  route('GET', /^\/api\/event$/, (req) => {
-    const v = volunteerFrom(req);
-    const data = store.publicEvent(v && v.id);
+  route('GET', /^\/api\/event$/, async (req) => {
+    const v = await volunteerFrom(req);
+    const data = await store.publicEvent(v && v.id);
     data.me = v ? { name: v.name } : null;
     return data;
   });
 
-  route('POST', /^\/api\/signup$/, (req, body) => {
+  route('POST', /^\/api\/signup$/, async (req, body) => {
     if (body.website) throw new HttpError(400, 'Ungültige Anfrage.'); // Honeypot gegen Spam-Bots
     if (!signupLimit(clientIp(req))) throw new HttpError(429, 'Zu viele Anmeldungen in kurzer Zeit. Bitte später erneut versuchen.');
-    const result = store.signup({ ...body, token: body.token || req.headers['x-volunteer-token'] });
+    const result = await store.signup({ ...body, token: body.token || req.headers['x-volunteer-token'] });
     return { token: result.volunteer.token, name: result.volunteer.name, signupId: result.signupId };
   });
 
-  route('GET', /^\/api\/me$/, (req) => {
-    const v = volunteerFrom(req);
-    if (!v) throw new HttpError(401, 'Dieser persönliche Link ist ungültig.');
+  route('GET', /^\/api\/me$/, async (req) => {
+    const v = await requireVolunteer(req);
     return {
       volunteer: { name: v.name, email: v.email, phone: v.phone },
-      signups: store.shiftsOfVolunteer(v.id),
-      settings: store.getSettings()
+      signups: await store.shiftsOfVolunteer(v.id),
+      settings: await store.getSettings()
     };
   });
 
-  route('PUT', /^\/api\/me$/, (req, body) => {
-    const v = volunteerFrom(req);
-    if (!v) throw new HttpError(401, 'Dieser persönliche Link ist ungültig.');
-    const u = store.updateVolunteer(v.id, body, { requireContact: true });
+  route('PUT', /^\/api\/me$/, async (req, body) => {
+    const v = await requireVolunteer(req);
+    const u = await store.updateVolunteer(v.id, body, { requireContact: true });
     return { volunteer: { name: u.name, email: u.email, phone: u.phone } };
   });
 
-  route('DELETE', /^\/api\/me\/signups\/(\d+)$/, (req, body, m) => {
-    const v = volunteerFrom(req);
-    if (!v) throw new HttpError(401, 'Dieser persönliche Link ist ungültig.');
-    store.cancelSignup(Number(m[1]), v.id);
+  route('DELETE', /^\/api\/me\/signups\/(\d+)$/, async (req, body, m) => {
+    const v = await requireVolunteer(req);
+    await store.cancelSignup(Number(m[1]), v.id);
     return { ok: true };
   });
 
@@ -165,46 +172,46 @@ function createApp(options = {}) {
   const admin = { admin: true };
   route('GET', /^\/api\/admin\/data$/, () => store.adminData(), admin);
   route('PUT', /^\/api\/admin\/settings$/, (req, body) => store.updateSettings(body), admin);
-  route('POST', /^\/api\/admin\/positions$/, (req, body) => ({ id: store.createPosition(body) }), admin);
-  route('PUT', /^\/api\/admin\/positions\/(\d+)$/, (req, body, m) => {
-    store.updatePosition(Number(m[1]), body, !!body.force);
+  route('POST', /^\/api\/admin\/positions$/, async (req, body) => ({ id: await store.createPosition(body) }), admin);
+  route('PUT', /^\/api\/admin\/positions\/(\d+)$/, async (req, body, m) => {
+    await store.updatePosition(Number(m[1]), body, !!body.force);
     return { ok: true };
   }, admin);
-  route('DELETE', /^\/api\/admin\/positions\/(\d+)$/, (req, body, m) => {
-    store.deletePosition(Number(m[1]));
+  route('DELETE', /^\/api\/admin\/positions\/(\d+)$/, async (req, body, m) => {
+    await store.deletePosition(Number(m[1]));
     return { ok: true };
   }, admin);
-  route('POST', /^\/api\/admin\/positions\/reorder$/, (req, body) => {
-    store.reorderPositions(body.ids);
+  route('POST', /^\/api\/admin\/positions\/reorder$/, async (req, body) => {
+    await store.reorderPositions(body.ids);
     return { ok: true };
   }, admin);
-  route('POST', /^\/api\/admin\/positions\/(\d+)\/shifts$/, (req, body, m) => ({ id: store.addShift(Number(m[1]), body) }), admin);
-  route('PUT', /^\/api\/admin\/shifts\/(\d+)$/, (req, body, m) => {
-    store.updateShift(Number(m[1]), body);
+  route('POST', /^\/api\/admin\/positions\/(\d+)\/shifts$/, async (req, body, m) => ({ id: await store.addShift(Number(m[1]), body) }), admin);
+  route('PUT', /^\/api\/admin\/shifts\/(\d+)$/, async (req, body, m) => {
+    await store.updateShift(Number(m[1]), body);
     return { ok: true };
   }, admin);
-  route('DELETE', /^\/api\/admin\/shifts\/(\d+)$/, (req, body, m) => {
-    store.deleteShift(Number(m[1]));
+  route('DELETE', /^\/api\/admin\/shifts\/(\d+)$/, async (req, body, m) => {
+    await store.deleteShift(Number(m[1]));
     return { ok: true };
   }, admin);
-  route('POST', /^\/api\/admin\/signups$/, (req, body) => {
-    const r = store.signup(body, { admin: true });
+  route('POST', /^\/api\/admin\/signups$/, async (req, body) => {
+    const r = await store.signup(body, { admin: true });
     return { signupId: r.signupId };
   }, admin);
-  route('DELETE', /^\/api\/admin\/signups\/(\d+)$/, (req, body, m) => {
-    store.deleteSignup(Number(m[1]));
+  route('DELETE', /^\/api\/admin\/signups\/(\d+)$/, async (req, body, m) => {
+    await store.deleteSignup(Number(m[1]));
     return { ok: true };
   }, admin);
-  route('PUT', /^\/api\/admin\/volunteers\/(\d+)$/, (req, body, m) => {
-    store.updateVolunteer(Number(m[1]), body, { requireContact: false });
+  route('PUT', /^\/api\/admin\/volunteers\/(\d+)$/, async (req, body, m) => {
+    await store.updateVolunteer(Number(m[1]), body, { requireContact: false });
     return { ok: true };
   }, admin);
-  route('DELETE', /^\/api\/admin\/volunteers\/(\d+)$/, (req, body, m) => {
-    store.deleteVolunteer(Number(m[1]));
+  route('DELETE', /^\/api\/admin\/volunteers\/(\d+)$/, async (req, body, m) => {
+    await store.deleteVolunteer(Number(m[1]));
     return { ok: true };
   }, admin);
-  route('GET', /^\/api\/admin\/export\.csv$/, (req, body, m, res) => {
-    const data = store.adminData();
+  route('GET', /^\/api\/admin\/export\.csv$/, async (req, body, m, res) => {
+    const data = await store.adminData();
     const rows = [['Position', 'Beginn', 'Ende', 'Plätze', 'Name', 'E-Mail', 'Telefon', 'Bemerkung']];
     for (const p of data.positions) {
       for (const sh of p.shifts) {

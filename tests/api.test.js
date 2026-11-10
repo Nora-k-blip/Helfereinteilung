@@ -3,10 +3,18 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createApp } = require('../server/app');
 
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+
 const quiet = { warn() {}, error() {}, log() {} };
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'helfer-test-'));
+process.on('exit', () => fs.rmSync(tmp, { recursive: true, force: true }));
+let n = 0;
+const freshDb = () => 'file:' + path.join(tmp, `db${++n}.db`);
 
 async function start(opts = {}) {
-  const { server, store } = createApp({ adminPassword: 'geheim', log: quiet, ...opts });
+  const { server, store } = await createApp({ adminPassword: 'geheim', log: quiet, dbUrl: freshDb(), ...opts });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${server.address().port}`;
   let adminCookie = '';
@@ -195,20 +203,14 @@ test('Seiten und statische Dateien', async (t) => {
 });
 
 test('Daten bleiben nach Neustart erhalten', async (t) => {
-  const fs = require('node:fs');
-  const os = require('node:os');
-  const path = require('node:path');
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'helfer-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  const dbFile = path.join(dir, 'test.db');
-
-  let app = await start({ dbFile });
+  const dbUrl = freshDb();
+  let app = await start({ dbUrl });
   const ev = (await app.call('GET', '/api/event')).data;
   const r = await app.call('POST', '/api/signup', { shiftId: findShift(ev, 'Springer').id, name: 'Dora', phone: '0123 456789' });
   await app.close();
-  app.store.close();
+  await app.store.close();
 
-  app = await start({ dbFile });
+  app = await start({ dbUrl });
   t.after(app.close);
   const me = (await app.call('GET', '/api/me', null, { 'X-Volunteer-Token': r.data.token })).data;
   assert.equal(me.volunteer.name, 'Dora');
